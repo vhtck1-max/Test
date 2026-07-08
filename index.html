@@ -88,38 +88,29 @@
             }
         };
 
-        function startScanner() {
-            html5QrCode = new Html5QrCode("reader");
-            
-            // Yêu cầu sử dụng camera sau (environment) với cấu hình Autofocus nâng cao
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                {
-                    ...scanConfig,
-                    // Ép trình duyệt kích hoạt Autofocus và chống rung nếu phần cứng hỗ trợ
-                    videoConstraints: {
-                        facingMode: "environment",
-                        focusMode: "continuous",
-                        advanced: [{ focusMode: "continuous" }]
-                    }
-                },
-                onScanSuccess
-            )
-            .then(() => {
-                isScanning = true;
-                document.getElementById('status').innerText = "Sẵn sàng quét...";
-                document.getElementById('status').style.color = "green";
-                
-                // Khởi tạo tính năng Zoom bằng cách can thiệp vào Hardware Track
-                setupZoomFeature();
-            })
-            .catch(err => {
-                document.getElementById('status').innerText = "Không thể mở camera. Hãy cấp quyền!";
-                document.getElementById('status').style.color = "red";
-                console.error(err);
-            });
-        }
-
+       function startScanner() {
+    html5QrCode = new Html5QrCode("reader");
+    
+    // Cấu hình chạy an toàn cho cả iPhone và Android
+    html5QrCode.start(
+        { facingMode: "environment" }, 
+        scanConfig,
+        onScanSuccess
+    )
+    .then(() => {
+        isScanning = true;
+        document.getElementById('status').innerText = "Sẵn sàng quét...";
+        document.getElementById('status').style.color = "green";
+        
+        // Khởi tạo tính năng Zoom nếu phần cứng hỗ trợ
+        setupZoomFeature();
+    })
+    .catch(err => {
+        document.getElementById('status').innerText = "Không thể mở camera. Hãy kiểm tra quyền truy cập!";
+        document.getElementById('status').style.color = "red";
+        console.error(err);
+    });
+}
         function setupZoomFeature() {
             try {
                 // Lấy luồng video đang chạy để kiểm tra khả năng Zoom của ống kính
