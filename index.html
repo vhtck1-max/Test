@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình Quét Mã QR Liên Tục</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background-color: #f4f4f9; }
+        #reader { width: 100%; max-width: 500px; margin: 0 auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #result { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #333; }
+        #status { color: green; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>Máy Quét Mã QR Liên Tục (Delay 1s)</h2>
+    <div id="reader"></div>
+    <div id="status">Sẵn sàng quét...</div>
+    <div id="result">Kết quả gần nhất: Chưa có dữ liệu</div>
+
+    <script>
+        // Thay thế bằng URL Web App bạn đã copy ở Bước 2
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxA7PfNhCsvUBCvejeAFZvEbEt-vSqrPargEHeI5yN9YLy1Lu9aKyxSxmVO-FhktzjX2g/exec";
+
+        let lastScanTime = 0; // Lưu mốc thời gian lần quét trước
+
+        function onScanSuccess(decodedText, decodedResult) {
+            const currentTime = Date.now();
+
+            // Khống chế thời gian quét giữa 2 lần buộc phải cách nhau ít nhất 1000ms (1 giây)
+            if (currentTime - lastScanTime >= 1000) {
+                lastScanTime = currentTime; // Cập nhật lại thời gian vừa quét
+
+                // Hiển thị kết quả lên màn hình
+                document.getElementById('result').innerText = "Kết quả gần nhất: " + decodedText;
+                document.getElementById('status').innerText = "Đang gửi dữ liệu lên Google Sheet...";
+                document.getElementById('status').style.color = "orange";
+
+                // Lấy thời gian hiện tại định dạng Việt Nam
+                const vietnamTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+
+                // Gửi dữ liệu qua Google Sheet bằng Fetch API (POST)
+                fetch(GOOGLE_SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors", // Bắt buộc dùng no-cors cho Apps Script khi gửi từ localhost
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        qrContent: decodedText,
+                        timestamp: vietnamTime
+                    })
+                })
+                .then(() => {
+                    document.getElementById('status').innerText = "Đã lưu thành công! Chờ quét tiếp...";
+                    document.getElementById('status').style.color = "green";
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('status').innerText = "Gửi thất bại, hãy thử lại.";
+                    document.getElementById('status').style.color = "red";
+                });
+            } else {
+                console.log("Quét quá nhanh! Bị bỏ qua do chưa đủ 1 giây.");
+            }
+        }
+
+        // Cấu hình camera quét
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 15, qrbox: { width: 250, height: 250 } }
+        );
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+</html>
