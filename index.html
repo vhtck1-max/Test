@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trình Quét Mã QR Nâng Cấp</title>
+    <title>Trình Quét Mã QR Nâng Cấp - Zoom 2x</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background-color: #f4f4f9; }
@@ -34,7 +34,7 @@
 </head>
 <body>
 
-    <h2>Máy Quét Mã QR Điều Khiển Luồng</h2>
+    <h2>Máy Quét Mã QR Điều Khiển Luồng (Zoom 2x)</h2>
     
     <div id="scanner-section">
         <div id="reader"></div>
@@ -74,6 +74,59 @@
                 "reader", { fps: 15, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true }
             );
             html5QrcodeScanner.render(onScanSuccess);
+
+            // Chờ một chút để thư viện render HTML, sau đó can thiệp cài đặt Zoom tự động
+            setTimeout(applyAutoZoom, 1200);
+        }
+
+        // Hàm tự động quét tìm luồng camera và ép zoom lên 2x
+        function applyAutoZoom() {
+            try {
+                if (html5QrcodeScanner && html5QrcodeScanner.html5Qrcode) {
+                    const html5QrcodeEngine = html5QrcodeScanner.html5Qrcode;
+                    
+                    // Kiểm tra xem camera đã thực sự mở chưa
+                    if (html5QrcodeEngine.isScanning) {
+                        const track = html5QrcodeEngine.getRunningTrack();
+                        if (track) {
+                            const capabilities = track.getCapabilities();
+                            // Kiểm tra thiết bị/trình duyệt có hỗ trợ tính năng Zoom vật lý không
+                            if (capabilities.zoom) {
+                                const minZoom = capabilities.zoom.min || 1;
+                                const maxZoom = capabilities.zoom.max || 1;
+                                
+                                // Ép mức zoom lên gấp đôi (2x), đảm bảo không vượt quá giới hạn tối đa của camera
+                                const targetZoom = Math.min(minZoom * 2, maxZoom);
+                                
+                                track.applyConstraints({
+                                    advanced: [{ zoom: targetZoom }]
+                                }).then(() => {
+                                    console.log(`Đã tự động phóng to camera lên mức: ${targetZoom}x`);
+                                }).catch(err => {
+                                    console.warn("Không thể thiết lập zoom phần cứng, chuyển sang dùng CSS zoom:", err);
+                                    applyCssZoom();
+                                });
+                                return; // Hoàn thành cấu hình zoom phần cứng thành công
+                            }
+                        }
+                    }
+                }
+                // Nếu camera chưa sẵn sàng, thử lại sau 300ms
+                setTimeout(applyAutoZoom, 300);
+            } catch (e) {
+                console.log("Đang cấu hình luồng camera... Thử lại.");
+                setTimeout(applyAutoZoom, 500);
+            }
+        }
+
+        // Phương án dự phòng bằng CSS kỹ thuật số nếu trình duyệt/thiết bị chặn tính năng zoom trực tiếp của camera
+        function applyCssZoom() {
+            const videoEl = document.querySelector("#reader video");
+            if (videoEl) {
+                videoEl.style.transform = "scale(2)";
+                videoEl.style.transformOrigin = "center center";
+                console.log("Đã kích hoạt phóng to 2x bằng CSS kỹ thuật số.");
+            }
         }
 
         // Khi quét thành công một mã
