@@ -1,5 +1,74 @@
-// CẤU HÌNH ĐƯỜNG DẪN ĐẾN SHEET CỦA BẠN
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby1nIJUxElDyCmR3dGo3-wKIGUaWvIIBQJGNHrOrwMoD8DONBvDFxcBnmMmLHDSy4zq1A/exec";
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trình Quét Mã QR Nâng Cấp Tốc Độ Cao</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 10px; background-color: #f4f4f9; color: #333; }
+        h2 { margin: 10px 0 5px 0; font-size: 1.3em; }
+        #status { font-weight: bold; margin: 8px 0; color: green; font-size: 1em; min-height: 20px; }
+        
+        /* Khung chứa camera */
+        #camera-section { width: 100%; max-width: 450px; margin: 0 auto; background: white; padding: 5px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); box-sizing: border-box; }
+        #reader { width: 100%; background: #000; border-radius: 6px; overflow: hidden; }
+        
+        /* Thanh zoom điều khiển */
+        #zoom-container { margin: 10px 5px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: bold; font-size: 0.9em; }
+        #zoom-slider { flex: 1; max-width: 300px; height: 8px; cursor: pointer; }
+
+        /* Giao diện khu vực kết quả & nút bấm */
+        #control-panel { display: none; width: 100%; max-width: 450px; margin: 10px auto; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); box-sizing: border-box; }
+        #qr-info { font-size: 1.1em; word-break: break-all; margin-bottom: 15px; background: #eee; padding: 12px; border-radius: 5px; font-weight: bold; }
+        
+        /* 3 Nút bấm tối ưu công thái học (Bấm siêu dễ) */
+        .btn-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .btn { padding: 18px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; -webkit-tap-highlight-color: transparent; }
+        .btn-delete { background-color: #e74c3c; grid-column: 1; }
+        .btn-back { background-color: #7f8c8d; grid-column: 1; }
+        .btn-add { background-color: #2ecc71; grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; justify-content: center; font-size: 1.4em; }
+        
+        /* Giao diện lịch sử 10 lần quét */
+        #history-box { width: 100%; max-width: 450px; margin: 15px auto; text-align: left; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); box-sizing: border-box; }
+        #history-box h3 { margin: 0 0 10px 0; font-size: 1em; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .history-item { font-size: 0.85em; padding: 6px 0; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center; }
+        .badge { padding: 3px 6px; border-radius: 4px; color: white; font-size: 0.75em; font-weight: bold; }
+        .badge-add { background: #2ecc71; }
+        .badge-delete { background: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <h2>Máy Quét Mã QR Liên Tục</h2>
+    <div id="status">Đang khởi động Camera...</div>
+
+    <div id="camera-section">
+        <div id="reader"></div>
+        <div id="zoom-container">
+            <span>Thu nhỏ</span>
+            <input type="range" id="zoom-slider" min="1" max="5" step="0.1" value="1" disabled>
+            <span>Phóng to</span>
+        </div>
+    </div>
+
+    <div id="control-panel">
+        <div id="qr-info">Nội dung QR</div>
+        <div class="btn-container">
+            <button class="btn btn-delete" onclick="sendData('Delete')">DELETE</button>
+            <button class="btn btn-back" onclick="resumeScanner()">BACK</button>
+            <button class="btn btn-add" onclick="sendData('Add')">ADD</button>
+        </div>
+    </div>
+
+    <div id="history-box">
+        <h3>Lịch sử quét gần nhất (Tối đa 10)</h3>
+        <div id="history-list"><i>Chưa có dữ liệu lịch sử...</i></div>
+    </div>
+
+    <script>
+       // CẤU HÌNH ĐƯỜNG DẪN ĐẾN SHEET CỦA BẠN
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxA7PfNhCsvUBCvejeAFZvEbEt-vSqrPargEHeI5yN9YLy1Lu9aKyxSxmVO-FhktzjX2g/exec";
         const CURRENT_USER = "User1";
 
         let html5QrCode;
