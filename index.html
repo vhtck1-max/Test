@@ -1,155 +1,137 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Quét QR - Quản lý linh kiện</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quét QR - Quản lý linh kiện</title>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-<style>
-    * { box-sizing: border-box; }
+    <style>
+        * { box-sizing: border-box; }
 
-    body {
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-        background: #f2f2f2;
-        color: #222;
-    }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: #f2f2f2;
+            color: #222;
+        }
 
-    .app-container {
-        max-width: 480px;
-        margin: 0 auto;
-        padding: 12px;
-    }
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 12px;
+        }
 
-    h1 {
-        font-size: 1.2em;
-        text-align: center;
-        margin: 8px 0 12px;
-    }
+        h1 {
+            font-size: 1.2em;
+            text-align: center;
+            margin: 8px 0 12px;
+        }
 
-    #status {
-        text-align: center;
-        font-weight: 600;
-        margin: 8px 0;
-        min-height: 1.2em;
-    }
+        #status {
+            text-align: center;
+            font-weight: 600;
+            margin: 8px 0;
+            min-height: 1.2em;
+        }
 
-    /* --- Camera --- */
-    #camera-section {
-        background: #000;
-        border-radius: 12px;
-        overflow: hidden;
-        position: relative;
-    }
+        /* --- Camera --- */
+        #camera-section {
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
 
-    #reader {
-        width: 100%;
-    }
+        #reader {
+            width: 100%;
+        }
 
-    #zoom-container {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 14px;
-        background: #111;
-    }
+        /* --- Control panel (sau khi quét thành công) --- */
+        #control-panel {
+            display: none;
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
 
-    #zoom-container span.zoom-label {
-        color: #fff;
-        font-size: 0.85em;
-        white-space: nowrap;
-    }
+        #qr-info {
+            word-break: break-all;
+            background: #f7f7f7;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 0.95em;
+            margin-bottom: 14px;
+            border: 1px solid #e0e0e0;
+            font-weight: 600;
+        }
 
-    #zoom-slider {
-        flex: 1;
-        width: 100%;
-    }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
 
-    /* --- Control panel (sau khi quét thành công) --- */
-    #control-panel {
-        display: none;
-        background: #fff;
-        border-radius: 12px;
-        padding: 16px;
-        margin-top: 12px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-    }
+        button {
+            flex: 1;
+            min-width: 100px;
+            padding: 14px 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            color: #fff;
+        }
 
-    #qr-info {
-        word-break: break-all;
-        background: #f7f7f7;
-        border-radius: 8px;
-        padding: 10px 12px;
-        font-size: 0.95em;
-        margin-bottom: 14px;
-        border: 1px solid #e0e0e0;
-    }
+        .btn-add { background: #2e7d32; }
+        .btn-delete { background: #c62828; }
+        .btn-cancel { background: #757575; }
 
-    .btn-row {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
+        button:active { opacity: 0.85; }
 
-    button {
-        flex: 1;
-        min-width: 100px;
-        padding: 12px 10px;
-        border: none;
-        border-radius: 8px;
-        font-size: 1em;
-        font-weight: 600;
-        cursor: pointer;
-        color: #fff;
-    }
+        /* --- History --- */
+        #history-container {
+            margin-top: 16px;
+        }
 
-    .btn-add { background: #2e7d32; }
-    .btn-delete { background: #c62828; }
-    .btn-cancel { background: #757575; }
+        #history-container h2 {
+            font-size: 1em;
+            margin: 0 0 8px;
+        }
 
-    button:active { opacity: 0.85; }
+        #history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
 
-    /* --- History --- */
-    #history-container {
-        margin-top: 16px;
-    }
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.85em;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+        }
 
-    #history-container h2 {
-        font-size: 1em;
-        margin: 0 0 8px;
-    }
+        .badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            color: #fff;
+            font-weight: 600;
+        }
 
-    #history-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .history-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #fff;
-        border-radius: 8px;
-        padding: 8px 12px;
-        font-size: 0.85em;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-    }
-
-    .badge {
-        padding: 3px 8px;
-        border-radius: 12px;
-        font-size: 0.75em;
-        color: #fff;
-        font-weight: 600;
-    }
-
-    .badge-add { background: #2e7d32; }
-    .badge-delete { background: #c62828; }
-</style>
+        .badge-add { background: #2e7d32; }
+        .badge-delete { background: #c62828; }
+    </style>
 </head>
 <body>
 
@@ -159,10 +141,6 @@
 
     <div id="camera-section">
         <div id="reader"></div>
-        <div id="zoom-container">
-            <span class="zoom-label">🔍 Zoom</span>
-            <input type="range" id="zoom-slider" min="1" max="1" step="0.1" value="1" disabled>
-        </div>
     </div>
 
     <div id="control-panel">
@@ -189,116 +167,43 @@
         let isScanning = false;
         let currentQRText = "";
         let scanHistory = [];
-        let zoomDebounceTimer = null;
 
-        // Cấu hình quét cơ bản, an toàn cho mọi thiết bị
+        // Cấu hình quét cơ bản, an toàn tuyệt đối cho mọi thiết bị
         const scanConfig = {
             fps: 15,
             qrbox: { width: 250, height: 250 }
         };
 
-        // Constraints khởi tạo camera: bật autofocus liên tục ngay từ đầu
-        // (giúp quét mã QR nhỏ trên linh kiện mà không cần chạm/zoom)
-        const videoConstraints = {
-            facingMode: "environment",
-            advanced: [{ focusMode: "continuous" }]
-        };
-
         function startScanner() {
-            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode = new Html5QrCode("reader");
 
-            // Timeout an toàn: nếu start() không phản hồi trong 8s -> báo lỗi thay vì treo vô hạn
-            let startTimedOut = false;
-            const safetyTimer = setTimeout(() => {
-                startTimedOut = true;
-                document.getElementById('status').innerText = "Camera khởi động quá lâu. Vui lòng tải lại trang!";
-                document.getElementById('status').style.color = "red";
-            }, 8000);
-
+            // Chỉ định gọi camera sau bằng cấu hình an toàn tiêu chuẩn
             html5QrCode.start(
-                videoConstraints,
+                { facingMode: "environment" },
                 scanConfig,
                 onScanSuccess
             )
             .then(() => {
-                clearTimeout(safetyTimer);
-                if (startTimedOut) return; // đã báo lỗi timeout, không ghi đè
                 isScanning = true;
                 document.getElementById('status').innerText = "Sẵn sàng quét...";
                 document.getElementById('status').style.color = "green";
-
-                // Đợi phần cứng ổn định rồi mới bật tính năng zoom
-                setTimeout(setupZoomFeature, 1000);
             })
             .catch(err => {
-                clearTimeout(safetyTimer);
                 document.getElementById('status').innerText = "Không thể mở camera. Hãy kiểm tra quyền truy cập!";
                 document.getElementById('status').style.color = "red";
                 console.error(err);
             });
         }
 
-        function setupZoomFeature() {
-            try {
-                // Dùng API chính thức của html5-qrcode thay vì tự lấy track/stream
-                // -> tránh xung đột với vòng lặp decode nội bộ của thư viện
-                const capabilities = html5QrCode.getRunningTrackCapabilities();
-                const zoomSlider = document.getElementById("zoom-slider");
-
-                if (capabilities && capabilities.zoom) {
-                    const zoomCap = capabilities.zoom;
-                    zoomSlider.min = zoomCap.min;
-                    zoomSlider.max = zoomCap.max;
-                    zoomSlider.step = zoomCap.step || 0.1;
-                    zoomSlider.value = zoomCap.min;
-                    zoomSlider.disabled = false;
-
-                    zoomSlider.oninput = function (e) {
-                        const targetZoom = parseFloat(e.target.value);
-
-                        // DEBOUNCE: chỉ áp dụng zoom sau khi người dùng ngừng kéo 150ms
-                        // -> tránh renegotiate luồng video liên tục gây treo
-                        clearTimeout(zoomDebounceTimer);
-                        zoomDebounceTimer = setTimeout(() => {
-                            applyZoomSafely(targetZoom);
-                        }, 150);
-                    };
-                } else {
-                    document.getElementById("zoom-container").innerHTML =
-                        "<span style='color:gray; font-size:0.85em;'>Thiết bị không hỗ trợ gạt Zoom trực tiếp</span>";
-                }
-
-                // Bật lại continuous autofocus nếu thiết bị hỗ trợ (phòng khi trình duyệt reset)
-                if (capabilities && capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
-                    html5QrCode.applyVideoConstraints({
-                        advanced: [{ focusMode: "continuous" }]
-                    }).catch(() => {});
-                }
-            } catch (e) {
-                console.log("Không thiết lập được tính năng zoom:", e);
-                document.getElementById("zoom-container").innerHTML =
-                    "<span style='color:gray; font-size:0.85em;'>Không hỗ trợ gạt Zoom trên thiết bị này</span>";
-            }
-        }
-
-        function applyZoomSafely(zoomValue) {
-            if (!html5QrCode) return;
-            html5QrCode.applyVideoConstraints({
-                advanced: [{ zoom: zoomValue }]
-            }).catch(err => {
-                console.log("Lỗi áp dụng zoom:", err);
-                // Không throw / không restart camera -> tránh vòng lặp treo
-            });
-        }
-
         function onScanSuccess(decodedText, decodedResult) {
             if (!isScanning) return;
-            isScanning = false;
+            isScanning = false; // Chặn tạm thời không cho quét tiếp liên tục
             currentQRText = decodedText;
 
+            // Ẩn màn hình camera, mở bảng điều khiển nút bấm lên
             document.getElementById('camera-section').style.display = 'none';
             document.getElementById('control-panel').style.display = 'block';
-            document.getElementById('qr-info').innerText = decodedText;
+            document.getElementById('qr-info').innerText = "Nội dung QR: " + decodedText;
             document.getElementById('status').innerText = "Vui lòng chọn hành động...";
             document.getElementById('status').style.color = "orange";
         }
@@ -337,13 +242,6 @@
             document.getElementById('camera-section').style.display = 'block';
             document.getElementById('status').innerText = "Sẵn sàng quét...";
             document.getElementById('status').style.color = "green";
-
-            // Trả thanh gạt zoom về min khi quét mã mới
-            const zoomSlider = document.getElementById("zoom-slider");
-            if (zoomSlider && !zoomSlider.disabled) {
-                zoomSlider.value = zoomSlider.min;
-                applyZoomSafely(parseFloat(zoomSlider.min));
-            }
 
             isScanning = true;
         }
