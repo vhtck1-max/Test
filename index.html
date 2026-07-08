@@ -2,73 +2,240 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trình Quét Mã QR Liên Tục</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trình Quét Mã QR Nâng Cấp Tốc Độ Cao</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background-color: #f4f4f9; }
-        #reader { width: 100%; max-width: 500px; margin: 0 auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        #result { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #333; }
-        #status { color: green; font-weight: bold; margin-top: 10px; }
+        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 10px; background-color: #f4f4f9; color: #333; }
+        h2 { margin: 10px 0 5px 0; font-size: 1.3em; }
+        #status { font-weight: bold; margin: 8px 0; color: green; font-size: 1em; min-height: 20px; }
+        
+        /* Khung chứa camera */
+        #camera-section { width: 100%; max-width: 450px; margin: 0 auto; background: white; padding: 5px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); box-sizing: border-box; }
+        #reader { width: 100%; background: #000; border-radius: 6px; overflow: hidden; }
+        
+        /* Thanh zoom điều khiển */
+        #zoom-container { margin: 10px 5px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: bold; font-size: 0.9em; }
+        #zoom-slider { flex: 1; max-width: 300px; height: 8px; cursor: pointer; }
+
+        /* Giao diện khu vực kết quả & nút bấm */
+        #control-panel { display: none; width: 100%; max-width: 450px; margin: 10px auto; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); box-sizing: border-box; }
+        #qr-info { font-size: 1.1em; word-break: break-all; margin-bottom: 15px; background: #eee; padding: 12px; border-radius: 5px; font-weight: bold; }
+        
+        /* 3 Nút bấm tối ưu công thái học (Bấm siêu dễ) */
+        .btn-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .btn { padding: 18px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; -webkit-tap-highlight-color: transparent; }
+        .btn-delete { background-color: #e74c3c; grid-column: 1; }
+        .btn-back { background-color: #7f8c8d; grid-column: 1; }
+        .btn-add { background-color: #2ecc71; grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; justify-content: center; font-size: 1.4em; }
+        
+        /* Giao diện lịch sử 10 lần quét */
+        #history-box { width: 100%; max-width: 450px; margin: 15px auto; text-align: left; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); box-sizing: border-box; }
+        #history-box h3 { margin: 0 0 10px 0; font-size: 1em; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .history-item { font-size: 0.85em; padding: 6px 0; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center; }
+        .badge { padding: 3px 6px; border-radius: 4px; color: white; font-size: 0.75em; font-weight: bold; }
+        .badge-add { background: #2ecc71; }
+        .badge-delete { background: #e74c3c; }
     </style>
 </head>
 <body>
 
-    <h2>Máy Quét Mã QR Liên Tục (Delay 1s)</h2>
-    <div id="reader"></div>
-    <div id="status">Sẵn sàng quét...</div>
-    <div id="result">Kết quả gần nhất: Chưa có dữ liệu</div>
+    <h2>Máy Quét Mã QR Liên Tục</h2>
+    <div id="status">Đang khởi động Camera...</div>
+
+    <div id="camera-section">
+        <div id="reader"></div>
+        <div id="zoom-container">
+            <span>Thu nhỏ</span>
+            <input type="range" id="zoom-slider" min="1" max="5" step="0.1" value="1" disabled>
+            <span>Phóng to</span>
+        </div>
+    </div>
+
+    <div id="control-panel">
+        <div id="qr-info">Nội dung QR</div>
+        <div class="btn-container">
+            <button class="btn btn-delete" onclick="sendData('Delete')">DELETE</button>
+            <button class="btn btn-back" onclick="resumeScanner()">BACK</button>
+            <button class="btn btn-add" onclick="sendData('Add')">ADD</button>
+        </div>
+    </div>
+
+    <div id="history-box">
+        <h3>Lịch sử quét gần nhất (Tối đa 10)</h3>
+        <div id="history-list"><i>Chưa có dữ liệu lịch sử...</i></div>
+    </div>
 
     <script>
-        // Thay thế bằng URL Web App bạn đã copy ở Bước 2
+        // CẤU HÌNH ĐƯỜNG DẪN ĐẾN SHEET CỦA BẠN
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxA7PfNhCsvUBCvejeAFZvEbEt-vSqrPargEHeI5yN9YLy1Lu9aKyxSxmVO-FhktzjX2g/exec";
+        const CURRENT_USER = "User1";
 
-        let lastScanTime = 0; // Lưu mốc thời gian lần quét trước
+        let html5QrCode;
+        let isScanning = false;
+        let currentQRText = "";
+        let scanHistory = [];
+        let cameraTrack = null; // Lưu track để điều khiển phần cứng kính cam
 
-        function onScanSuccess(decodedText, decodedResult) {
-            const currentTime = Date.now();
+        // Cấu hình quét nâng cao
+        const scanConfig = { 
+            fps: 20, 
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+                // Hộp quét chiếm 70% khung hình để tập trung lấy nét chính giữa
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                const boxSize = Math.floor(minEdge * 0.7);
+                return { width: boxSize, height: boxSize };
+            }
+        };
 
-            // Khống chế thời gian quét giữa 2 lần buộc phải cách nhau ít nhất 1000ms (1 giây)
-            if (currentTime - lastScanTime >= 1000) {
-                lastScanTime = currentTime; // Cập nhật lại thời gian vừa quét
+        function startScanner() {
+            html5QrCode = new Html5QrCode("reader");
+            
+            // Yêu cầu sử dụng camera sau (environment) với cấu hình Autofocus nâng cao
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                {
+                    ...scanConfig,
+                    // Ép trình duyệt kích hoạt Autofocus và chống rung nếu phần cứng hỗ trợ
+                    videoConstraints: {
+                        facingMode: "environment",
+                        focusMode: "continuous",
+                        advanced: [{ focusMode: "continuous" }]
+                    }
+                },
+                onScanSuccess
+            )
+            .then(() => {
+                isScanning = true;
+                document.getElementById('status').innerText = "Sẵn sàng quét...";
+                document.getElementById('status').style.color = "green";
+                
+                // Khởi tạo tính năng Zoom bằng cách can thiệp vào Hardware Track
+                setupZoomFeature();
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = "Không thể mở camera. Hãy cấp quyền!";
+                document.getElementById('status').style.color = "red";
+                console.error(err);
+            });
+        }
 
-                // Hiển thị kết quả lên màn hình
-                document.getElementById('result').innerText = "Kết quả gần nhất: " + decodedText;
-                document.getElementById('status').innerText = "Đang gửi dữ liệu lên Google Sheet...";
-                document.getElementById('status').style.color = "orange";
-
-                // Lấy thời gian hiện tại định dạng Việt Nam
-                const vietnamTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-
-                // Gửi dữ liệu qua Google Sheet bằng Fetch API (POST)
-                fetch(GOOGLE_SCRIPT_URL, {
-                    method: "POST",
-                    mode: "no-cors", // Bắt buộc dùng no-cors cho Apps Script khi gửi từ localhost
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        qrContent: decodedText,
-                        timestamp: vietnamTime
-                    })
-                })
-                .then(() => {
-                    document.getElementById('status').innerText = "Đã lưu thành công! Chờ quét tiếp...";
-                    document.getElementById('status').style.color = "green";
-                })
-                .catch(err => {
-                    console.error(err);
-                    document.getElementById('status').innerText = "Gửi thất bại, hãy thử lại.";
-                    document.getElementById('status').style.color = "red";
-                });
-            } else {
-                console.log("Quét quá nhanh! Bị bỏ qua do chưa đủ 1 giây.");
+        function setupZoomFeature() {
+            try {
+                // Lấy luồng video đang chạy để kiểm tra khả năng Zoom của ống kính
+                const scannerVideoElement = document.querySelector("#reader video");
+                if (!scannerVideoElement) return;
+                
+                const stream = scannerVideoElement.srcObject;
+                cameraTrack = stream.getVideoTracks()[0];
+                const capabilities = cameraTrack.getCapabilities();
+                
+                const zoomSlider = document.getElementById("zoom-slider");
+                
+                // Nếu điện thoại có hỗ trợ zoom kỹ thuật số qua trình duyệt
+                if ("zoom" in capabilities) {
+                    zoomSlider.min = capabilities.zoom.min;
+                    zoomSlider.max = capabilities.zoom.max;
+                    zoomSlider.step = capabilities.zoom.step;
+                    zoomSlider.value = capabilities.zoom.min;
+                    zoomSlider.disabled = false;
+                    
+                    // Lắng nghe sự kiện kéo thanh gạt zoom
+                    zoomSlider.addEventListener("input", (e) => {
+                        cameraTrack.applyConstraints({
+                            advanced: [{ zoom: parseFloat(e.target.value) }]
+                        });
+                    });
+                } else {
+                    document.getElementById("zoom-container").innerHTML = "<span style='color:gray; font-size:0.85em;'>Thiết bị/Trình duyệt không hỗ trợ gạt Zoom trực tiếp</span>";
+                }
+            } catch (e) {
+                console.log("Không thiết lập được thanh zoom:", e);
             }
         }
 
-        // Cấu hình camera quét
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", { fps: 15, qrbox: { width: 250, height: 250 } }
-        );
-        html5QrcodeScanner.render(onScanSuccess);
+        function onScanSuccess(decodedText, decodedResult) {
+            if (!isScanning) return;
+            isScanning = false; // Chặn quét tiếp
+            currentQRText = decodedText;
+
+            // Hiển thị giao diện nhập liệu, ẩn camera
+            document.getElementById('camera-section').style.display = 'none';
+            document.getElementById('control-panel').style.display = 'block';
+            document.getElementById('qr-info').innerText = decodedText;
+            document.getElementById('status').innerText = "Vui lòng chọn hành động...";
+            document.getElementById('status').style.color = "orange";
+        }
+
+        function sendData(actionType) {
+            document.getElementById('status').innerText = `Đang gửi lệnh ${actionType}...`;
+            document.getElementById('status').style.color = "orange";
+            const vietnamTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    qrContent: currentQRText,
+                    timestamp: vietnamTime,
+                    action: actionType,
+                    user: CURRENT_USER
+                })
+            })
+            .then(() => {
+                document.getElementById('status').innerText = `Đã lưu thành công: ${actionType}!`;
+                document.getElementById('status').style.color = "green";
+                updateHistory(vietnamTime, currentQRText, actionType);
+                resumeScanner();
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = "Lỗi kết nối. Vui lòng bấm lại!";
+                document.getElementById('status').style.color = "red";
+                isScanning = false;
+            });
+        }
+
+        function resumeScanner() {
+            document.getElementById('control-panel').style.display = 'none';
+            document.getElementById('camera-section').style.display = 'block';
+            document.getElementById('status').innerText = "Sẵn sàng quét...";
+            document.getElementById('status').style.color = "green";
+            
+            // Reset thanh gạt zoom về x1 khi quét mã mới (tránh bị quá mờ)
+            const zoomSlider = document.getElementById("zoom-slider");
+            if (zoomSlider && !zoomSlider.disabled && cameraTrack) {
+                zoomSlider.value = zoomSlider.min;
+                cameraTrack.applyConstraints({ advanced: [{ zoom: parseFloat(zoomSlider.min) }] });
+            }
+            
+            isScanning = true;
+        }
+
+        function updateHistory(time, content, action) {
+            scanHistory.unshift({ time, content, action });
+            if (scanHistory.length > 10) scanHistory.pop();
+
+            const listContainer = document.getElementById('history-list');
+            listContainer.innerHTML = "";
+
+            scanHistory.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "history-item";
+                const shortContent = item.content.length > 22 ? item.content.substring(0, 22) + "..." : item.content;
+                const badgeClass = item.action === 'Add' ? 'badge-add' : 'badge-delete';
+                const timeOnly = item.time.split(" ")[1] || "";
+
+                itemDiv.innerHTML = `
+                    <span><b>[${timeOnly}]</b> ${shortContent}</span>
+                    <span class="badge ${badgeClass}">${item.action}</span>
+                `;
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        // Chạy máy quét ngay khi tải xong trang
+        window.addEventListener("DOMContentLoaded", startScanner);
     </script>
 </body>
 </html>
