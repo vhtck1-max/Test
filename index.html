@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trình Quét Mã QR Nâng Cấp - Zoom 2x</title>
+    <title>Trình Quét Mã QR Nâng Cấp - Zoom 2x & Auto Focus</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background-color: #f4f4f9; }
@@ -19,7 +19,7 @@
         .btn { padding: 12px; font-size: 1em; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; color: white; }
         .btn-delete { background-color: #dc3545; grid-column: 1; } /* Bên trái trên */
         .btn-back { background-color: #6c757d; grid-column: 1; }   /* Bên trái dưới */
-        .btn-add { background-color: #28a745; grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; justify-content: center; } /* Bên phải, chiếm 2 hàng tương đương nút giữa dưới */
+        .btn-add { background-color: #28a745; grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; justify-content: center; } /* Bên phải, chiếm 2 hàng */
 
         /* Lịch sử quét */
         #history-container { max-width: 500px; margin: 30px auto 0 auto; text-align: left; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
@@ -34,7 +34,7 @@
 </head>
 <body>
 
-    <h2>Máy Quét Mã QR Điều Khiển Luồng (Zoom 2x)</h2>
+    <h2>Máy Quét QR Điều Khiển Luồng (Zoom 2x & Auto Focus)</h2>
     
     <div id="scanner-section">
         <div id="reader"></div>
@@ -65,8 +65,8 @@
 
         let html5QrcodeScanner;
         let currentScannedText = ""; 
-        let scanHistory = []; // Mảng lưu lịch sử quét
-        let isProcessing = false; // Trạng thái đợi phản hồi từ Google Sheet
+        let scanHistory = []; 
+        let isProcessing = false; 
 
         // Khởi tạo Scanner
         function initScanner() {
@@ -75,69 +75,76 @@
             );
             html5QrcodeScanner.render(onScanSuccess);
 
-            // Chờ một chút để thư viện render HTML, sau đó can thiệp cài đặt Zoom tự động
-            setTimeout(applyAutoZoom, 1200);
+            // Chờ luồng camera khởi chạy ổn định rồi áp dụng cấu hình phần cứng
+            setTimeout(applyCameraSettings, 1200);
         }
 
-        // Hàm tự động quét tìm luồng camera và ép zoom lên 2x
-        function applyAutoZoom() {
+        // Cấu hình đồng thời Zoom 2x và Tự động lấy nét liên tục (Continuous Focus)
+        function applyCameraSettings() {
             try {
                 if (html5QrcodeScanner && html5QrcodeScanner.html5Qrcode) {
                     const html5QrcodeEngine = html5QrcodeScanner.html5Qrcode;
                     
-                    // Kiểm tra xem camera đã thực sự mở chưa
                     if (html5QrcodeEngine.isScanning) {
                         const track = html5QrcodeEngine.getRunningTrack();
                         if (track) {
                             const capabilities = track.getCapabilities();
-                            // Kiểm tra thiết bị/trình duyệt có hỗ trợ tính năng Zoom vật lý không
+                            const advancedConstraints = {};
+
+                            // 1. XỬ LÝ ZOOM PHẦN CỨNG
                             if (capabilities.zoom) {
                                 const minZoom = capabilities.zoom.min || 1;
                                 const maxZoom = capabilities.zoom.max || 1;
-                                
-                                // Ép mức zoom lên gấp đôi (2x), đảm bảo không vượt quá giới hạn tối đa của camera
-                                const targetZoom = Math.min(minZoom * 2, maxZoom);
-                                
+                                advancedConstraints.zoom = Math.min(minZoom * 2, maxZoom);
+                            }
+
+                            // 2. XỬ LÝ TỰ ĐỘNG LẤY NÉT PHẦN CỨNG (Continuous Focus)
+                            if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                                advancedConstraints.focusMode = 'continuous';
+                            }
+
+                            // Áp dụng các thay đổi phần cứng lên mắt Camera
+                            if (Object.keys(advancedConstraints).length > 0) {
                                 track.applyConstraints({
-                                    advanced: [{ zoom: targetZoom }]
+                                    advanced: [advancedConstraints]
                                 }).then(() => {
-                                    console.log(`Đã tự động phóng to camera lên mức: ${targetZoom}x`);
+                                    console.log("Đã áp dụng cấu hình phần cứng:", advancedConstraints);
                                 }).catch(err => {
-                                    console.warn("Không thể thiết lập zoom phần cứng, chuyển sang dùng CSS zoom:", err);
+                                    console.warn("Lỗi thiết lập phần cứng, kích hoạt chế độ thu phóng CSS dự phòng:", err);
                                     applyCssZoom();
                                 });
-                                return; // Hoàn thành cấu hình zoom phần cứng thành công
+                                return;
                             }
                         }
                     }
                 }
-                // Nếu camera chưa sẵn sàng, thử lại sau 300ms
-                setTimeout(applyAutoZoom, 300);
+                // Nếu camera chưa render kịp, thử lại sau mỗi 300ms
+                setTimeout(applyCameraSettings, 300);
             } catch (e) {
-                console.log("Đang cấu hình luồng camera... Thử lại.");
-                setTimeout(applyAutoZoom, 500);
+                console.log("Đang chờ luồng camera hoạt động ổn định...");
+                setTimeout(applyCameraSettings, 500);
             }
         }
 
-        // Phương án dự phòng bằng CSS kỹ thuật số nếu trình duyệt/thiết bị chặn tính năng zoom trực tiếp của camera
+        // Phương án dự phòng bằng CSS nếu trình duyệt/thiết bị chặn quyền can thiệp phần cứng
         function applyCssZoom() {
             const videoEl = document.querySelector("#reader video");
             if (videoEl) {
                 videoEl.style.transform = "scale(2)";
                 videoEl.style.transformOrigin = "center center";
-                console.log("Đã kích hoạt phóng to 2x bằng CSS kỹ thuật số.");
+                console.log("Đã kích hoạt phóng to 2x bằng kỹ thuật số CSS.");
             }
         }
 
         // Khi quét thành công một mã
         function onScanSuccess(decodedText, decodedResult) {
-            if (isProcessing) return; // Nếu đang xử lý hành động trước thì bỏ qua
+            if (isProcessing) return; 
 
             currentScannedText = decodedText;
 
-            // 1. Dừng quét bằng cách xóa trình quét (Giải phóng camera)
+            // Dừng quét bằng cách xóa trình quét (Giải phóng camera)
             html5QrcodeScanner.clear().then(() => {
-                // 2. Hiện thông tin QR và giao diện nút bấm
+                // Hiện thông tin QR và giao diện nút bấm
                 document.getElementById('qr-data').innerText = decodedText;
                 document.getElementById('scanner-section').style.display = 'none';
                 document.getElementById('preview-container').style.display = 'block';
@@ -166,18 +173,16 @@
                 body: JSON.stringify({
                     qrContent: currentScannedText,
                     timestamp: vietnamTime,
-                    action: actionType, // Truyền Add/Delete (sẽ vào cột D)
-                    user: "User1"       // Truyền User1 (sẽ vào cột E)
+                    action: actionType, 
+                    user: "User1"       
                 })
             })
             .then(() => {
                 document.getElementById('status').innerText = `Đã lưu thành công với lệnh: ${actionType}!`;
                 document.getElementById('status').style.color = "green";
                 
-                // Cập nhật vào lịch sử hiển thị
                 updateHistory(currentScannedText, vietnamTime, actionType);
                 
-                // Trở lại màn hình quét tự động sau khi lưu thành công
                 setTimeout(() => {
                     isProcessing = false;
                     goBack();
@@ -198,21 +203,17 @@
             document.getElementById('status').innerText = "Sẵn sàng quét...";
             document.getElementById('status').style.color = "green";
             
-            // Khởi động lại camera để quét tiếp
             initScanner();
         }
 
         // Hàm cập nhật lịch sử 10 lần gần nhất
         function updateHistory(content, time, action) {
-            // Thêm bản ghi mới vào đầu mảng
             scanHistory.unshift({ content, time, action });
 
-            // Khống chế mảng tối đa 10 phần tử
             if (scanHistory.length > 10) {
                 scanHistory.pop();
             }
 
-            // Render lại danh sách ra giao diện
             const historyListEl = document.getElementById('history-list');
             historyListEl.innerHTML = "";
 
@@ -224,7 +225,6 @@
             });
         }
 
-        // Chạy trình quét lần đầu khi tải trang
         window.onload = initScanner;
     </script>
 </body>
