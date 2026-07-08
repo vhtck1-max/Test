@@ -1,147 +1,178 @@
 <!DOCTYPE html>
-
 <html lang="vi">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Trình Quét Mã QR Liên Tục</title>
-
+    <title>Trình Quét Mã QR Nâng Cấp</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-
     <style>
-
         body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background-color: #f4f4f9; }
-
         #reader { width: 100%; max-width: 500px; margin: 0 auto; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #status { color: green; font-weight: bold; margin-top: 10px; min-height: 20px; }
+        
+        /* Giao diện xem trước kết quả và nút bấm */
+        #preview-container { display: none; max-width: 500px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #qr-data { font-size: 1.2em; font-weight: bold; color: #333; margin-bottom: 20px; word-break: break-all; }
+        
+        /* Định vị các nút bấm theo yêu cầu */
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-width: 300px; margin: 0 auto; }
+        .btn { padding: 12px; font-size: 1em; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; color: white; }
+        .btn-delete { background-color: #dc3545; grid-column: 1; } /* Bên trái trên */
+        .btn-back { background-color: #6c757d; grid-column: 1; }   /* Bên trái dưới */
+        .btn-add { background-color: #28a745; grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; justify-content: center; } /* Bên phải, chiếm 2 hàng tương đương nút giữa dưới */
 
-        #result { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #333; }
-
-        #status { color: green; font-weight: bold; margin-top: 10px; }
-
+        /* Lịch sử quét */
+        #history-container { max-width: 500px; margin: 30px auto 0 auto; text-align: left; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #history-container h3 { margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 8px; color: #555; }
+        #history-list { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; }
+        #history-list li { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9em; color: #666; }
+        #history-list li:first-child { font-weight: bold; color: #000; }
+        .badge { display: inline-block; padding: 2px 6px; font-size: 0.8em; font-weight: bold; border-radius: 3px; color: white; margin-left: 5px; }
+        .badge-add { background-color: #28a745; }
+        .badge-delete { background-color: #dc3545; }
     </style>
-
 </head>
-
 <body>
 
+    <h2>Máy Quét Mã QR Điều Khiển Luồng</h2>
+    
+    <div id="scanner-section">
+        <div id="reader"></div>
+    </div>
 
-
-    <h2>Máy Quét Mã QR Liên Tục (Delay 1s)</h2>
-
-    <div id="reader"></div>
+    <div id="preview-container">
+        <h3>Thông tin mã QR:</h3>
+        <div id="qr-data">Chưa có dữ liệu</div>
+        
+        <div class="button-group">
+            <button class="btn btn-delete" onclick="handleAction('Delete')">Delete</button>
+            <button class="btn btn-add" onclick="handleAction('Add')">Add</button>
+            <button class="btn btn-back" onclick="goBack()">Back</button>
+        </div>
+    </div>
 
     <div id="status">Sẵn sàng quét...</div>
 
-    <div id="result">Kết quả gần nhất: Chưa có dữ liệu</div>
-
-
+    <div id="history-container">
+        <h3>Lịch sử quét (Tối đa 10 lần gần nhất)</h3>
+        <ul id="history-list">
+            <li style="text-align: center; color: #999;">Chưa có lịch sử quét.</li>
+        </ul>
+    </div>
 
     <script>
-
-        // Thay thế bằng URL Web App bạn đã copy ở Bước 2
-
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxA7PfNhCsvUBCvejeAFZvEbEt-vSqrPargEHeI5yN9YLy1Lu9aKyxSxmVO-FhktzjX2g/exec";
 
+        let html5QrcodeScanner;
+        let currentScannedText = ""; 
+        let scanHistory = []; // Mảng lưu lịch sử quét
+        let isProcessing = false; // Trạng thái đợi phản hồi từ Google Sheet
 
-
-        let lastScanTime = 0; // Lưu mốc thời gian lần quét trước
-
-
-
-        function onScanSuccess(decodedText, decodedResult) {
-
-            const currentTime = Date.now();
-
-
-
-            // Khống chế thời gian quét giữa 2 lần buộc phải cách nhau ít nhất 1000ms (1 giây)
-
-            if (currentTime - lastScanTime >= 1000) {
-
-                lastScanTime = currentTime; // Cập nhật lại thời gian vừa quét
-
-
-
-                // Hiển thị kết quả lên màn hình
-
-                document.getElementById('result').innerText = "Kết quả gần nhất: " + decodedText;
-
-                document.getElementById('status').innerText = "Đang gửi dữ liệu lên Google Sheet...";
-
-                document.getElementById('status').style.color = "orange";
-
-
-
-                // Lấy thời gian hiện tại định dạng Việt Nam
-
-                const vietnamTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-
-
-
-                // Gửi dữ liệu qua Google Sheet bằng Fetch API (POST)
-
-                fetch(GOOGLE_SCRIPT_URL, {
-
-                    method: "POST",
-
-                    mode: "no-cors", // Bắt buộc dùng no-cors cho Apps Script khi gửi từ localhost
-
-                    headers: { "Content-Type": "application/json" },
-
-                    body: JSON.stringify({
-
-                        qrContent: decodedText,
-
-                        timestamp: vietnamTime
-
-                    })
-
-                })
-
-                .then(() => {
-
-                    document.getElementById('status').innerText = "Đã lưu thành công! Chờ quét tiếp...";
-
-                    document.getElementById('status').style.color = "green";
-
-                })
-
-                .catch(err => {
-
-                    console.error(err);
-
-                    document.getElementById('status').innerText = "Gửi thất bại, hãy thử lại.";
-
-                    document.getElementById('status').style.color = "red";
-
-                });
-
-            } else {
-
-                console.log("Quét quá nhanh! Bị bỏ qua do chưa đủ 1 giây.");
-
-            }
-
+        // Khởi tạo Scanner
+        function initScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", { fps: 15, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true }
+            );
+            html5QrcodeScanner.render(onScanSuccess);
         }
 
+        // Khi quét thành công một mã
+        function onScanSuccess(decodedText, decodedResult) {
+            if (isProcessing) return; // Nếu đang xử lý hành động trước thì bỏ qua
 
+            currentScannedText = decodedText;
 
-        // Cấu hình camera quét
+            // 1. Dừng quét bằng cách xóa trình quét (Giải phóng camera)
+            html5QrcodeScanner.clear().then(() => {
+                // 2. Hiện thông tin QR và giao diện nút bấm
+                document.getElementById('qr-data').innerText = decodedText;
+                document.getElementById('scanner-section').style.display = 'none';
+                document.getElementById('preview-container').style.display = 'block';
+                document.getElementById('status').innerText = "Vui lòng chọn hành động (Add/Delete) hoặc Quay lại.";
+                document.getElementById('status').style.color = "#333";
+            }).catch(err => {
+                console.error("Lỗi khi dừng camera:", err);
+            });
+        }
 
-        const html5QrcodeScanner = new Html5QrcodeScanner(
+        // Xử lý khi nhấn nút Add hoặc Delete
+        function handleAction(actionType) {
+            if (isProcessing) return;
+            isProcessing = true;
 
-            "reader", { fps: 15, qrbox: { width: 250, height: 250 } }
+            document.getElementById('status').innerText = `Đang gửi dữ liệu [${actionType}] lên Google Sheet...`;
+            document.getElementById('status').style.color = "orange";
 
-        );
+            const vietnamTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
 
-        html5QrcodeScanner.render(onScanSuccess);
+            // Gửi dữ liệu qua Google Sheet
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    qrContent: currentScannedText,
+                    timestamp: vietnamTime,
+                    action: actionType, // Truyền Add/Delete (sẽ vào cột D)
+                    user: "User1"       // Truyền User1 (sẽ vào cột E)
+                })
+            })
+            .then(() => {
+                document.getElementById('status').innerText = `Đã lưu thành công với lệnh: ${actionType}!`;
+                document.getElementById('status').style.color = "green";
+                
+                // Cập nhật vào lịch sử hiển thị
+                updateHistory(currentScannedText, vietnamTime, actionType);
+                
+                // Trở lại màn hình quét tự động sau khi lưu thành công
+                setTimeout(() => {
+                    isProcessing = false;
+                    goBack();
+                }, 1000);
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('status').innerText = "Gửi thất bại, hãy thử lại.";
+                document.getElementById('status').style.color = "red";
+                isProcessing = false;
+            });
+        }
 
+        // Quay lại màn hình quét
+        function goBack() {
+            document.getElementById('preview-container').style.display = 'none';
+            document.getElementById('scanner-section').style.display = 'block';
+            document.getElementById('status').innerText = "Sẵn sàng quét...";
+            document.getElementById('status').style.color = "green";
+            
+            // Khởi động lại camera để quét tiếp
+            initScanner();
+        }
+
+        // Hàm cập nhật lịch sử 10 lần gần nhất
+        function updateHistory(content, time, action) {
+            // Thêm bản ghi mới vào đầu mảng
+            scanHistory.unshift({ content, time, action });
+
+            // Khống chế mảng tối đa 10 phần tử
+            if (scanHistory.length > 10) {
+                scanHistory.pop();
+            }
+
+            // Render lại danh sách ra giao diện
+            const historyListEl = document.getElementById('history-list');
+            historyListEl.innerHTML = "";
+
+            scanHistory.forEach(item => {
+                const li = document.createElement('li');
+                const badgeClass = item.action === 'Add' ? 'badge-add' : 'badge-delete';
+                li.innerHTML = `[${item.time}] <strong>${item.content}</strong> -> <span class="badge ${badgeClass}">${item.action}</span>`;
+                historyListEl.appendChild(li);
+            });
+        }
+
+        // Chạy trình quét lần đầu khi tải trang
+        window.onload = initScanner;
     </script>
-
 </body>
-
 </html>
